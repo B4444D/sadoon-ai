@@ -3,63 +3,48 @@ const fetch = require("node-fetch");
 const bodyParser = require("body-parser");
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// بيانات UltraMsg
+const instanceId = "instance113729";
+const token = "oos4lu5jzk95b5g9";
+
+// لقراءة البيانات القادمة من UltraMsg
 app.use(bodyParser.json());
 
-const token = "oos4lu5jzk95b5g9";
-const instanceId = "instance113729";
-
-// تخزين حالات المستخدمين
-const users = {};
-
+// نقطة استقبال الرسائل
 app.post("/webhook", async (req, res) => {
   const data = req.body;
-  const phone = data.from;
-  const message = data.body?.toLowerCase();
-  const type = data.type;
 
-  if (!users[phone]) {
-    users[phone] = { step: "start" };
+  // ✅ طباعة للتأكد إن الرسالة وصلت
+  console.log("📥 استقبلنا رسالة جديدة من UltraMsg:");
+  console.log(JSON.stringify(data, null, 2));
+
+  const sender = data.from;
+  const message = data.body;
+
+  if (!sender || !message) {
+    return res.sendStatus(400);
   }
 
-  const user = users[phone];
+  // ✅ رد تلقائي مبدئي
+  const reply = {
+    token,
+    to: sender,
+    body: "👋 هلا! معك سعدون AI 🤖\nأرسل لي صورة وسأحولها إلى كاريكاتير 🎨",
+    priority: "high",
+  };
 
-  // ===== START المنطق =====
-  if (type === "image") {
-    user.image = data.media;
-    user.step = "select-style";
-    await reply(phone, `✅ تم استلام الصورة!\n\nاختر نوع التحويل:\n1️⃣ كاريكاتير\n2️⃣ أنمي\n3️⃣ رسم ظريف`);
-  } else if (user.step === "select-style" && ["1", "2", "3"].includes(message)) {
-    user.style = message;
-    user.step = "ask-description";
-    await reply(phone, `🎨 أرسل وصفًا مخصصًا (مثال: لابس شماغ) أو اكتب "تخطي"`);
-  } else if (user.step === "ask-description") {
-    user.description = message === "تخطي" ? "" : message;
-    user.step = "select-format";
-    await reply(phone, `🖼️ هل تود النتيجة:\n1️⃣ صورة عادية\n2️⃣ ملصق واتساب`);
-  } else if (user.step === "select-format" && ["1", "2"].includes(message)) {
-    user.format = message;
-    user.step = "processing";
-    await reply(phone, `⏳ جاري تحويل صورتك... انتظر قليلاً`);
-
-    // مكان التنفيذ الحقيقي لاحقًا (مثال: callReplicate(user))
-    setTimeout(() => {
-      reply(phone, `🎉 تم التحويل! (صورة وهمية هنا)\n[ستتم إضافة الصورة قريبًا]`);
-    }, 2000);
-  } else {
-    await reply(phone, `👋 أهلًا! أرسل صورة لنبدأ تحويلها إلى كاريكاتير 🎨`);
-  }
+  await fetch(`https://api.ultramsg.com/${instanceId}/messages/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(reply),
+  });
 
   res.sendStatus(200);
 });
 
-async function reply(to, body) {
-  await fetch(`https://api.ultramsg.com/${instanceId}/messages/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token, to, body, priority: "high" }),
-  });
-}
-
-app.listen(3000, () => {
-  console.log("🤖 سعدون AI جاهز على http://localhost:3000");
+// تشغيل السيرفر
+app.listen(PORT, () => {
+  console.log(`🚀 سعدون AI شغّال على http://localhost:${PORT}`);
 });
